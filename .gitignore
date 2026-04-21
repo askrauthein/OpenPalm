@@ -1,0 +1,13 @@
+# Ambientes virtuais
+.venv/
+
+# Caches e arquivos temporários do Python e testes
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# Configurações locais do OpenPalm
+.openpalm/
+
+# Arquivos do sistema (macOS)
+.DS_Store

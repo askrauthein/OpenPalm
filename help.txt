@@ -1,0 +1,92 @@
+OpenPalm Command Reference
+
+WhatsApp Commands
+
+1) Project Commands
+- /project add-local <project_id> <path>
+  Example:
+  /project add-local api-billing /Users/ask/work/api-billing
+
+- /project add-github <project_id> <clone_url>
+  Example:
+  /project add-github portal-web git@github.com:company/portal-web.git
+
+- /project list
+
+- /project info <project_id>
+
+- /project use <project_id>
+
+- /project current
+
+- /project remove <project_id>
+
+- /project checkout <project_id>
+- /project checkout <project_id> branch=<name>
+- /project checkout <project_id> tag=<name>
+- /project checkout <project_id> commit=<sha>
+
+- /project update <project_id>
+
+2) Agent Commands
+- /agent enable
+- /agent disable
+
+- /agent use codex
+- /agent use claude-code
+
+- /agent current
+
+3) Task Commands
+- /ask [agent=codex|claude-code] <prompt>
+  Runs the selected agent in non-interactive detached mode (parallel) and returns result asynchronously
+
+- /tokens
+  Shows global accumulated tokens used by one-off runs for codex and claude-code
+
+- /task project=<project_id> agent=<agent> <instruction>
+  Example:
+  /task project=api-billing agent=codex Fix webhook retry flow and run tests
+
+- /task agent=<agent> <instruction>
+  (uses current project)
+
+- /task project=<project_id> ref=<ref> agent=<agent> <instruction>
+  Example:
+  /task project=api-billing ref=develop agent=claude-code Adjust login flow
+
+4) Job Commands
+
+- /status
+  Shows all active user requests/jobs that are still running in real time
+- /job list
+
+- /job status <job_id>
+
+- /job result <job_id>
+
+- /job logs <job_id>
+
+- /job cancel <job_id>
+
+5) AI Shell Mode Commands
+- /say <text>
+  macOS only: runs `say -v Luciana "<text>"`
+
+- /ai enable
+- /ai disable
+
+When enabled, plain text messages (non-slash commands) are treated as shell commands.
+
+CLI Commands
+
+- openpalm run
+- openpalm login [--reset-session]
+- openpalm status
+- openpalm logout
+
+Alternative module execution:
+- python -m openpalm run
+- python -m openpalm login
+- python -m openpalm status
+- python -m openpalm logout
