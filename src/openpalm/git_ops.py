@@ -9,21 +9,26 @@ from openpalm.agent_models import Project
 
 class GitOps:
     def ensure_materialized(self, project: Project) -> Path:
+        if not project.path:
+            raise ValueError(f"Project {project.project_id} has no path")
+        
+        target_path = Path(project.path).expanduser()
+
         if project.source_type == "local":
-            if not project.path:
-                raise ValueError(f"Local project {project.project_id} has no path")
-            return Path(project.path).expanduser()
+            return target_path
 
-        if not project.cache_path or not project.clone_url:
-            raise ValueError(f"GitHub project {project.project_id} is missing cache_path or clone_url")
-
-        cache_path = Path(project.cache_path).expanduser()
-        if not (cache_path / ".git").exists():
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            self._run(["git", "clone", project.clone_url, str(cache_path)], cwd=cache_path.parent)
-        else:
-            self._run(["git", "fetch", "--all", "--prune"], cwd=cache_path)
-        return cache_path
+        if project.source_type == "github":
+            if not project.clone_url:
+                raise ValueError(f"GitHub project {project.project_id} is missing clone_url")
+            
+            if not (target_path / ".git").exists():
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                self._run(["git", "clone", project.clone_url, str(target_path)], cwd=target_path.parent)
+            else:
+                self._run(["git", "fetch", "--all", "--prune"], cwd=target_path)
+            return target_path
+        
+        return target_path
 
     def validate_project(self, project: Project, repo_path: Path, ref: str) -> None:
         if not repo_path.exists():
@@ -49,15 +54,10 @@ class GitOps:
 
         self._resolve_ref(repo_path, ref)
 
-    def create_workspace(self, project: Project, source_repo: Path, workspace_path: Path, base_ref: str, work_branch: str) -> None:
-        if workspace_path.exists():
-            shutil.rmtree(workspace_path)
-        workspace_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Isolated repo per task.
-        self._run(["git", "clone", str(source_repo), str(workspace_path)], cwd=workspace_path.parent)
-        self._run(["git", "checkout", base_ref], cwd=workspace_path)
-        self._run(["git", "checkout", "-b", work_branch], cwd=workspace_path)
+    def prepare_branch(self, repo_path: Path, base_ref: str, work_branch: str) -> None:
+        # Check out base ref and create new branch in the visible repo
+        self._run(["git", "checkout", base_ref], cwd=repo_path)
+        self._run(["git", "checkout", "-b", work_branch], cwd=repo_path)
 
     def update_cache(self, project: Project) -> Path:
         repo_path = self.ensure_materialized(project)

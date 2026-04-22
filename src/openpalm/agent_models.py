@@ -30,7 +30,6 @@ class Project:
     clone_url: str | None
     git_remote: str | None
     default_branch: str
-    cache_path: str | None
     marker_file: str
     allowed_agents: list[str]
     enabled: bool = True
@@ -38,6 +37,7 @@ class Project:
 
 @dataclass(slots=True)
 class AgentRuntimeState:
+    project_box: str | None = None
     current_project: str | None = None
     current_agent: str = "codex"
     agent_mode_enabled: bool = True

@@ -82,6 +82,26 @@ def cmd_logout(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_projectbox(args: argparse.Namespace) -> int:
+    from openpalm.agent_config import load_agent_paths
+    from openpalm.agent_state import AgentStateStore
+    from pathlib import Path
+
+    paths = load_agent_paths()
+    store = AgentStateStore(paths.state_file)
+    state = store.load()
+
+    if args.path:
+        new_box = str(Path(args.path).expanduser())
+        state.project_box = new_box
+        store.save(state)
+        print(f"Project Box set to: {new_box}")
+    else:
+        current = state.project_box or "~/openpalm-projects"
+        print(f"Current Project Box: {current}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="openpalm")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -98,6 +118,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_logout = sub.add_parser("logout", help="Remove local session")
     p_logout.set_defaults(func=cmd_logout)
+
+    p_box = sub.add_parser("projectbox", help="View or set the Project Box directory")
+    p_box.add_argument("path", nargs="?", help="New path for the Project Box")
+    p_box.set_defaults(func=cmd_projectbox)
 
     return parser
 

@@ -46,7 +46,6 @@ class ProjectRegistry:
                 clone_url=_to_none(payload.get("clone_url")),
                 git_remote=_to_none(payload.get("git_remote")),
                 default_branch=str(payload.get("default_branch", "main")),
-                cache_path=_to_none(payload.get("cache_path")),
                 marker_file=str(payload.get("marker_file", ".project-agent.toml")),
                 allowed_agents=list(payload.get("allowed_agents", ["codex", "claude-code"])),
                 enabled=bool(payload.get("enabled", True)),

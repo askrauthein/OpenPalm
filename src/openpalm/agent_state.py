@@ -15,6 +15,7 @@ class AgentStateStore:
             return AgentRuntimeState()
         raw = json.loads(self.path.read_text(encoding="utf-8"))
         return AgentRuntimeState(
+            project_box=raw.get("project_box"),
             current_project=raw.get("current_project"),
             current_agent=str(raw.get("current_agent", "codex")),
             agent_mode_enabled=bool(raw.get("agent_mode_enabled", True)),
@@ -26,6 +27,7 @@ class AgentStateStore:
         self.path.write_text(
             json.dumps(
                 {
+                    "project_box": state.project_box,
                     "current_project": state.current_project,
                     "current_agent": state.current_agent,
                     "agent_mode_enabled": state.agent_mode_enabled,

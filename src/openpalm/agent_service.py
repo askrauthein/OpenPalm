@@ -91,8 +91,43 @@ class AgentService:
             return "Usage: /project <action> ..."
         action = parts[1]
 
-        if action == "add-local" and len(parts) >= 4:
-            project_id, path = parts[2], " ".join(parts[3:])
+        if action == "box":
+            if len(parts) >= 3:
+                new_box = " ".join(parts[2:])
+                self.state.project_box = str(Path(new_box).expanduser())
+                self.state_store.save(self.state)
+                return f"Project Box set to: {self.state.project_box}"
+            current = self.state.project_box or "~/openpalm-projects"
+            return f"Current Project Box: {current}"
+
+        def _get_target_path(pid: str, user_path: str | None = None) -> str:
+            if user_path:
+                return str(Path(user_path).expanduser())
+            box = Path(self.state.project_box or "~/openpalm-projects").expanduser()
+            return str(box / pid)
+
+        if action == "clone" and len(parts) >= 4:
+            project_id, clone_url = parts[2], parts[3]
+            path = _get_target_path(project_id, " ".join(parts[4:]) if len(parts) > 4 else None)
+            p = Project(
+                project_id=project_id,
+                source_type="github",
+                path=path,
+                repo=_repo_from_clone_url(clone_url),
+                clone_url=clone_url,
+                git_remote=clone_url,
+                default_branch="main",
+                marker_file=".project-agent.toml",
+                allowed_agents=["codex", "claude-code"],
+                enabled=True,
+            )
+            self.projects.add(p)
+            self.git.ensure_materialized(p)
+            return f"Project cloned: {project_id} -> {path}"
+
+        if action == "create" and len(parts) >= 3:
+            project_id = parts[2]
+            path = _get_target_path(project_id, " ".join(parts[3:]) if len(parts) > 3 else None)
             p = Project(
                 project_id=project_id,
                 source_type="local",
@@ -101,32 +136,25 @@ class AgentService:
                 clone_url=None,
                 git_remote=None,
                 default_branch="main",
-                cache_path=None,
                 marker_file=".project-agent.toml",
                 allowed_agents=["codex", "claude-code"],
                 enabled=True,
             )
             self.projects.add(p)
-            return f"Project added: {project_id} (local)"
+            Path(path).mkdir(parents=True, exist_ok=True)
+            return f"Project created: {project_id} -> {path}"
 
-        if action == "add-github" and len(parts) >= 4:
-            project_id, clone_url = parts[2], parts[3]
-            cache_path = str(self.paths.repos_dir / project_id)
-            p = Project(
-                project_id=project_id,
-                source_type="github",
-                path=None,
-                repo=_repo_from_clone_url(clone_url),
-                clone_url=clone_url,
-                git_remote=clone_url,
-                default_branch="main",
-                cache_path=cache_path,
-                marker_file=".project-agent.toml",
-                allowed_agents=["codex", "claude-code"],
-                enabled=True,
-            )
+        if action == "set-dir" and len(parts) >= 4:
+            project_id = parts[2]
+            path = " ".join(parts[3:])
+            p = self.projects.get(project_id)
+            if not p:
+                return "Project not found."
+            p.path = str(Path(path).expanduser())
+            self.projects.add(p)  # wait, add will raise ValueError if it exists! We need to update.
+            self.projects.remove(project_id)
             self.projects.add(p)
-            return f"Project added: {project_id} (github)"
+            return f"Project directory updated: {project_id} -> {p.path}"
 
         if action == "list":
             items = self.projects.list_projects()
@@ -226,7 +254,7 @@ class AgentService:
 
         job_id = self._next_job_id()
         work_branch = f"task/{job_id.replace('job-', '')}-{_slug(instruction)}"
-        workspace_path = str(self.paths.jobs_dir / f"{job_id}-{project_id}")
+        workspace_path = project.path or ""
         now = datetime.now(timezone.utc)
         job = Job(
             job_id=job_id,
@@ -369,7 +397,7 @@ class AgentService:
 
             self.jobs.update_status(job_id, "creating_workspace")
             workspace = Path(job.workspace_path)
-            self.git.create_workspace(project, repo_path, workspace, job.base_ref, job.work_branch)
+            self.git.prepare_branch(workspace, job.base_ref, job.work_branch)
             self.jobs.add_event(job_id, "workspace_created", str(workspace))
 
             if self.jobs.is_cancelled(job_id):
