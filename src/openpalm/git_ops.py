@@ -78,8 +78,22 @@ class GitOps:
             self._run(["git", "fetch", "--all", "--prune"], cwd=repo_path)
         return repo_path
 
+    def get_default_branch(self, repo_path: Path) -> str | None:
+        try:
+            out = self._run(
+                ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+                cwd=repo_path,
+            ).strip()
+        except RuntimeError:
+            return None
+        return out.removeprefix("origin/") or None
+
     def _resolve_ref(self, repo_path: Path, ref: str) -> None:
-        self._run(["git", "rev-parse", "--verify", ref], cwd=repo_path)
+        try:
+            self._run(["git", "rev-parse", "--verify", ref], cwd=repo_path)
+        except RuntimeError:
+            # Fallback to check if it's a remote branch that hasn't been checked out yet
+            self._run(["git", "rev-parse", "--verify", f"origin/{ref}"], cwd=repo_path)
 
     def _run(self, cmd: list[str], cwd: Path) -> str:
         cp = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True)

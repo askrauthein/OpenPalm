@@ -194,7 +194,7 @@ class AgentService:
             if not p:
                 return "Project not found."
             repo_path = self.git.update_cache(p)
-            base_ref = ref or p.default_branch
+            base_ref = ref or self.git.get_default_branch(repo_path) or p.default_branch
             self.git.validate_project(p, repo_path, base_ref)
             return f"Project ready: {pid}\nPath: {repo_path}\nRef: {base_ref}"
 
@@ -250,7 +250,7 @@ class AgentService:
         if not instruction:
             return "Job rejected. Missing instruction text."
 
-        base_ref = kv.get("ref") or project.default_branch
+        base_ref = kv.get("ref") or ""
 
         job_id = self._next_job_id()
         work_branch = f"task/{job_id.replace('job-', '')}-{_slug(instruction)}"
@@ -275,7 +275,7 @@ class AgentService:
             f"Job {job_id} created.\n"
             f"Project: {project_id}\n"
             f"Agent: {agent}\n"
-            f"Base ref: {base_ref}\n"
+            f"Base ref: {base_ref or '(auto: repo default)'}\n"
             "Status: queued"
         )
 
@@ -389,6 +389,11 @@ class AgentService:
             self._notify(f"Job {job_id} started. Preparing project {job.project_id}.")
 
             repo_path = self.git.ensure_materialized(project)
+
+            if not job.base_ref:
+                detected = self.git.get_default_branch(repo_path)
+                job.base_ref = detected or project.default_branch or "main"
+                self.jobs.add_event(job_id, "base_ref_resolved", job.base_ref)
 
             self.jobs.update_status(job_id, "validating_project")
             self.git.validate_project(project, repo_path, job.base_ref)
