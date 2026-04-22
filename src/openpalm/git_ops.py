@@ -42,8 +42,21 @@ class GitOps:
         if project.git_remote or project.clone_url:
             found = self._run(["git", "remote", "get-url", "origin"], cwd=repo_path).strip()
             expected = project.git_remote or project.clone_url
-            if expected and found != expected:
-                raise ValueError(f"Remote mismatch: expected {expected}, found {found}")
+            if expected:
+                def _norm(u: str) -> str:
+                    u = u.strip()
+                    if u.endswith(".git"):
+                        u = u[:-4]
+                    if u.startswith("https://github.com/"):
+                        u = u[19:]
+                    elif u.startswith("git@github.com:"):
+                        u = u[15:]
+                    elif u.startswith("ssh://git@github.com/"):
+                        u = u[21:]
+                    return u
+                
+                if _norm(found) != _norm(expected):
+                    raise ValueError(f"Remote mismatch: expected {expected}, found {found}")
 
         if project.marker_file:
             marker = repo_path / project.marker_file
