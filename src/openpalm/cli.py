@@ -102,6 +102,98 @@ def cmd_projectbox(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_help(args: argparse.Namespace) -> int:
+    build_parser().print_help()
+    return 0
+
+
+
+def cmd_chat(args: argparse.Namespace) -> int:
+    from datetime import datetime, timezone
+    from openpalm.models import IncomingMessage
+    from openpalm.app import OpenPalmApp
+
+    cfg = load_config()
+    setup_logging(cfg)
+
+    class CommandLineClientAdapter:
+        def __init__(self, message: str | None = None):
+            self._handler = None
+            self._message = message
+            self._running = False
+
+        def ensure_authenticated(self, reset_session: bool = False) -> None:
+            pass
+
+        def connect(self) -> None:
+            pass
+
+        def disconnect(self) -> None:
+            pass
+
+        def own_jid(self) -> str:
+            return "cli@localhost"
+
+        def on_text_message(self, handler) -> None:
+            self._handler = handler
+
+        def send_text(self, to_jid: str, text: str) -> None:
+            print(f"\n[OpenPalm]\n{text}")
+
+        def run_forever(self) -> None:
+            self._running = True
+            if self._message is not None:
+                if self._handler:
+                    msg = IncomingMessage(
+                        message_id=f"cli-{time.time()}",
+                        from_jid="user@localhost",
+                        to_jid="cli@localhost",
+                        text=self._message,
+                        timestamp=datetime.now(timezone.utc),
+                        message_type="text",
+                        from_me=True
+                    )
+                    self._handler(msg)
+                return
+
+            print("OpenPalm CLI Chat (Ctrl+C or 'exit' to quit)")
+            try:
+                msg_id = 1
+                while self._running:
+                    text = input("\n[You]> ")
+                    if text.strip().lower() in ("exit", "quit"):
+                        break
+                    if not text.strip():
+                        continue
+                    if self._handler:
+                        msg = IncomingMessage(
+                            message_id=f"cli-loop-{msg_id}-{time.time()}",
+                            from_jid="user@localhost",
+                            to_jid="cli@localhost",
+                            text=text,
+                            timestamp=datetime.now(timezone.utc),
+                            message_type="text",
+                            from_me=True
+                        )
+                        self._handler(msg)
+                        msg_id += 1
+            except (KeyboardInterrupt, EOFError):
+                print()
+
+    wa_client = CommandLineClientAdapter(message=args.message)
+    state_manager = CommandStateManager(JsonStorage(cfg.state_file))
+    dedup_store = ProcessedMessageStore(cfg.dedup_file)
+
+    app = OpenPalmApp(
+        cfg=cfg,
+        wa_client=wa_client,  # type: ignore
+        state_manager=state_manager,
+        dedup_store=dedup_store,
+    )
+    app.run()
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="openpalm")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -122,6 +214,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_box = sub.add_parser("projectbox", help="View or set the Project Box directory")
     p_box.add_argument("path", nargs="?", help="New path for the Project Box")
     p_box.set_defaults(func=cmd_projectbox)
+
+    p_help = sub.add_parser("help", help="Show this help message")
+    p_help.set_defaults(func=cmd_help)
+
+    p_chat = sub.add_parser("chat", help="Send a message to openpalm directly from the CLI or start an interactive chat")
+    p_chat.add_argument("message", nargs="?", help="Message to send (optional)")
+    p_chat.set_defaults(func=cmd_chat)
 
     return parser
 
