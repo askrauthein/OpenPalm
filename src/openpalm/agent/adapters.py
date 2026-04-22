@@ -22,13 +22,13 @@ class AgentAdapter(Protocol):
 
 
 class SubprocessAgentAdapter:
-    def __init__(self, executable: str) -> None:
+    def __init__(self, executable: str, prefix_args: list[str] | None = None) -> None:
         self.executable = executable
+        self.prefix_args = list(prefix_args or [])
 
     def start(self, workspace: Path, instruction: str) -> subprocess.Popen[str]:
-        # Generic adapter: send instruction as CLI args so it works with wrappers/scripts.
         return subprocess.Popen(
-            [self.executable, instruction],
+            [self.executable, *self.prefix_args, instruction],
             cwd=str(workspace),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -48,5 +48,8 @@ def build_agent_adapter(agent_name: str) -> AgentAdapter:
     if agent_name == "codex":
         return SubprocessAgentAdapter("codex")
     if agent_name == "claude-code":
-        return SubprocessAgentAdapter("claude")
+        return SubprocessAgentAdapter(
+            "claude",
+            prefix_args=["--dangerously-skip-permissions", "-p"],
+        )
     raise ValueError(f"Unsupported agent: {agent_name}")
